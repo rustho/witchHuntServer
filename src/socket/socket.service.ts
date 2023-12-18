@@ -7,96 +7,217 @@ import {
   WebSocketServer
 } from "@nestjs/websockets";
 import { Server } from "socket.io";
-
-type Rooms = Map<string, Set<any>>
-
-interface RoomCreatedEvent {
-  rooms: string[];
-}
+import { InjectModel } from "@nestjs/mongoose";
+import { Client, Room, RoomDocument } from "../room/room.model";
+import mongoose, { Model } from "mongoose";
 
 @WebSocketGateway({
   cors: {
-    origin: '*'
+    origin: "*"
   }
 })
 export class SocketService implements OnGatewayConnection {
+  constructor(
+    @InjectModel(Room.name) private readonly roomModel: Model<Room>
+  ) {
+  }
 
   @WebSocketServer()
   server: Server;
 
-  rooms: Rooms = new Map();
 
-  getRoomsList(): string[] {
-    return Array.from(this.rooms.keys());
+  async getRoomsList(): Promise<Room[]> {
+    return this.roomModel.find({}, { name: 1, createdAt: 1, clients: 1, authorName: 1 })
+      .sort({ createdAt: -1 });
   }
 
-  @SubscribeMessage('getRoomsList')
+  @SubscribeMessage("deleteAllRooms")
+  async handleDeleteAllRooms(@ConnectedSocket() client: any) {
+    try {
+      await this.roomModel.deleteMany({});
+
+      await this.roomListWasChanged();
+    } catch (error) {
+      // Handle errors, log, or emit an error event if needed
+      console.error("Error deleting all rooms:", error.message);
+    }
+  }
+
+  async getRoomClients(roomId: string): Promise<Client[]> {
+    const room = await this.roomModel.findOne({ _id: roomId }) as Room;
+    return room ? room.clients : [];
+  }
+
+  @SubscribeMessage("getClientsList")
+  handleGetClientsList(@MessageBody() { roomId }: { roomId: string }): Promise<Client[]> {
+    return this.getRoomClients(roomId);
+  }
+
+  @SubscribeMessage("getRoomsList")
   handleGetRoomsList(@ConnectedSocket() client: any) {
-    return this.getRoomsList()
+    return this.getRoomsList();
   }
 
-  @SubscribeMessage('joinRoom')
-  handleJoinRoom(@MessageBody() roomName: string, @ConnectedSocket() client: any) {
-    // Покинуть предыдущую комнату, если был в неё подключён
-    this.leaveRoom(client);
+  @SubscribeMessage("joinRoom")
+  async handleJoinRoom(@MessageBody() {
+    roomId,
+    userName
+  }: { roomId: string, userName: string }, @ConnectedSocket() client: any) {
+    await this.leaveRoom(roomId, client);
 
-    // Присоединиться к новой комнате
-    client.join(roomName);
-    this.addToRoom(roomName, client);
+    client.join(roomId);
+    await this.addToRoom(roomId, userName, client);
 
-    // Отправить сообщение о присоединении к комнате
-    this.server.to(roomName).emit('roomJoined', { room: roomName, clientId: client.id });
+    const clientsInRoom = await this.getRoomClients(roomId);
+    const data = { room: roomId, clients: clientsInRoom, userName };
+    this.server.to(roomId).emit("roomChanged", data);
+
+    await this.roomListWasChanged();
+
+    return data;
   }
 
-  @SubscribeMessage('leaveRoom')
-  handleLeaveRoom(@ConnectedSocket() client: any) {
-    this.leaveRoom(client);
+  @SubscribeMessage("leaveRoom")
+  async handleLeaveRoom(@MessageBody() roomData: { room: string }, @ConnectedSocket() client: any) {
+    const roomId = roomData.room;
+
+    console.log("here", roomId);
+    await this.leaveRoom(roomId, client);
+
+    await this.roomListWasChanged();
+
+    // const clientsInRoom = await this.getRoomClients(roomId);
+    // this.server.to(roomId).emit('roomChanged', { room: roomId, clients: clientsInRoom });
   }
 
-  private leaveRoom(client: any) {
-    Object.keys(client.rooms).forEach(room => {
-      if (room !== client.id) {
-        this.removeFromRoom(room, client);
-        client.leave(room);
-        this.server.to(room).emit('roomLeft', { room, clientId: client.id });
-      }
-    });
+  getRoomId(client: any) {
+    // console.log('client.rooms', client.rooms, client.id);
+    //
+    // // for (const room of Object.keys(client.rooms)) {
+    // //   if (room !== client.id) {
+    // //     return room;
+    // //   }
+    // // }
+    // const rooms = [...client.rooms].filter(room => room !== client.id)
+    // console.log('rooms', rooms);
+    // return rooms[rooms.length - 1];
   }
 
 
-  @SubscribeMessage('createRoom')
-  handleCreateRoom(@MessageBody() roomData: { room: string }, @ConnectedSocket() client: any)  {
+  private async leaveRoom(roomId: string, client: any) {
+    console.log("leave", roomId);
+
+    client.leave(roomId);
+    await this.removeFromRoom(roomId, client);
+
+    const clientsInRoom = await this.getRoomClients(roomId);
+    console.log("clientsInRoom", clientsInRoom);
+    this.server.to(roomId).emit("roomChanged", { room: roomId, clients: clientsInRoom });
+
+    // for (const room of Object.keys(client.rooms)) {
+    //   if (room !== client.id) {
+    //     await this.removeFromRoom(room, client);
+    //     client.leave(room);
+    //
+    //     const clientsInRoom = await this.getRoomClients(room);
+    //     this.server.to(room).emit('roomChanged', { room, clients: clientsInRoom });
+    //   }
+    // }
+    // console.log('leave', client.id, client.rooms);
+    // for (const room of Object.keys(client.rooms)) {
+    //   if (room !== client.id) {
+    //     await this.removeFromRoom(room, client);
+    //     client.leave(room);
+    //
+    //     const clientsInRoom = await this.getRoomClients(room);
+    //     this.server.to(room).emit('roomChanged', { room, clients: clientsInRoom });
+    //   }
+    // }
+  }
+
+  async roomListWasChanged() {
+    if (this.server && this.server.emit) {
+      const rooms = await this.getRoomsList();
+      this.server.emit("roomCreated", { rooms } as any);
+    }
+  }
+
+  @SubscribeMessage("createRoom")
+  async handleCreateRoom(@MessageBody() roomData: { room: string }, @ConnectedSocket() client: any) {
+    const roomId: string = roomData.room;
+
+    client.join(roomId);
+    await this.addRoom(roomId, client);
+
+    await this.roomListWasChanged();
+  }
+
+  @SubscribeMessage("deleteRoom")
+  async handleDeleteRoom(@MessageBody() roomData: { room: string }) {
     const roomName: string = roomData.room;
 
-    this.rooms.set(roomName, new Set());
+    await this.removeRoom(roomName);
 
-    client.join(roomName);
-    this.addToRoom(roomName, client);
-
-    if (this.server && this.server.emit) {
-      const rooms = this.getRoomsList()
-      this.server.emit('roomCreated', { rooms } as any);
-    }
+    await this.roomListWasChanged();
   }
 
 
-  private addToRoom(roomName: string, client: any) {
-    if (!this.rooms.has(roomName)) {
-      this.rooms.set(roomName, new Set());
-    }
-    this.rooms.get(roomName).add(client);
-  }
+  private async addToRoom(roomId: string, userName: string, client: any) {
+    const room = await this.roomModel.findOne({ _id: roomId }) as Room;
 
-  private removeFromRoom(roomName: string, client: any) {
-    if (this.rooms.has(roomName)) {
-      this.rooms.get(roomName).delete(client);
-      if (this.rooms.get(roomName).size === 0) {
-        this.rooms.delete(roomName);
+    if (room) {
+      const isUsernameTaken = room.clients.some(client => client.name === userName);
+
+      if (isUsernameTaken) {
+        return { error: "Username is already taken in this room." };
       }
+
+      room.clients.push({
+        id: client.id,
+        name: userName
+      });
+
+      await room.save();
+
+      const clientsInRoom = await this.getRoomClients(roomId);
+      this.server.to(roomId).emit("roomChanged", { room: roomId, clients: clientsInRoom });
+    }
+  }
+
+  private async addRoom(roomName: string, client: any) {
+    const newRoom = new this.roomModel({
+      name: roomName,
+      createdAt: new Date(),
+      authorName: client?.username || "Аноним"
+    });
+
+    await newRoom.save();
+  }
+
+  private async removeRoom(roomName: string) {
+    await this.roomModel.findOneAndDelete({ name: roomName });
+  }
+
+  private async removeFromRoom(roomId: string, client: any) {
+    console.log("roomId", roomId);
+    console.log("clientID", client.id);
+    const room = await this.roomModel.findOne({ _id: roomId }) as Room;
+
+    console.log("ssss", room);
+    if (room) {
+      room.clients = room.clients.filter(el => el.id !== client.id);
+      await room.save();
+      await this.roomListWasChanged();
+
+      // if (index !== -1) {
+      //   room.clients.splice(index, 1);
+      //   console.log('after fix', room.clients);
+      //
+      // }
     }
   }
 
   handleConnection(client: any, ...args): any {
-    console.log(client.id + ' CONNECTED');
+    console.log(client.id + " CONNECTED");
   }
 }
