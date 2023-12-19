@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 
 export interface Client {
   id: string;
+  subtitle: number;
   name: string;
 }
 
@@ -15,7 +16,7 @@ export class Room {
   @Prop()
   createdAt: Date;
 
-  @Prop({ type: [{ id: String, name: String }], default: [] })
+  @Prop({ type: [{ id: String, name: String, subtitle: Number }], default: [] })
   clients: Client[];
 
   @Prop()

@@ -61,12 +61,13 @@ export class SocketService implements OnGatewayConnection {
   @SubscribeMessage("joinRoom")
   async handleJoinRoom(@MessageBody() {
     roomId,
-    userName
-  }: { roomId: string, userName: string }, @ConnectedSocket() client: any) {
+    userName,
+    subtitle
+  }: { roomId: string, userName: string, subtitle: number | string }, @ConnectedSocket() client: any) {
     await this.leaveRoom(roomId, client);
 
     client.join(roomId);
-    await this.addToRoom(roomId, userName, client);
+    await this.addToRoom(roomId, userName, subtitle, client);
 
     const clientsInRoom = await this.getRoomClients(roomId);
     const data = { room: roomId, clients: clientsInRoom, userName };
@@ -81,58 +82,17 @@ export class SocketService implements OnGatewayConnection {
   async handleLeaveRoom(@MessageBody() roomData: { room: string }, @ConnectedSocket() client: any) {
     const roomId = roomData.room;
 
-    console.log("here", roomId);
     await this.leaveRoom(roomId, client);
 
     await this.roomListWasChanged();
-
-    // const clientsInRoom = await this.getRoomClients(roomId);
-    // this.server.to(roomId).emit('roomChanged', { room: roomId, clients: clientsInRoom });
   }
-
-  getRoomId(client: any) {
-    // console.log('client.rooms', client.rooms, client.id);
-    //
-    // // for (const room of Object.keys(client.rooms)) {
-    // //   if (room !== client.id) {
-    // //     return room;
-    // //   }
-    // // }
-    // const rooms = [...client.rooms].filter(room => room !== client.id)
-    // console.log('rooms', rooms);
-    // return rooms[rooms.length - 1];
-  }
-
 
   private async leaveRoom(roomId: string, client: any) {
-    console.log("leave", roomId);
-
     client.leave(roomId);
     await this.removeFromRoom(roomId, client);
 
     const clientsInRoom = await this.getRoomClients(roomId);
-    console.log("clientsInRoom", clientsInRoom);
     this.server.to(roomId).emit("roomChanged", { room: roomId, clients: clientsInRoom });
-
-    // for (const room of Object.keys(client.rooms)) {
-    //   if (room !== client.id) {
-    //     await this.removeFromRoom(room, client);
-    //     client.leave(room);
-    //
-    //     const clientsInRoom = await this.getRoomClients(room);
-    //     this.server.to(room).emit('roomChanged', { room, clients: clientsInRoom });
-    //   }
-    // }
-    // console.log('leave', client.id, client.rooms);
-    // for (const room of Object.keys(client.rooms)) {
-    //   if (room !== client.id) {
-    //     await this.removeFromRoom(room, client);
-    //     client.leave(room);
-    //
-    //     const clientsInRoom = await this.getRoomClients(room);
-    //     this.server.to(room).emit('roomChanged', { room, clients: clientsInRoom });
-    //   }
-    // }
   }
 
   async roomListWasChanged() {
@@ -162,7 +122,7 @@ export class SocketService implements OnGatewayConnection {
   }
 
 
-  private async addToRoom(roomId: string, userName: string, client: any) {
+  private async addToRoom(roomId: string, userName: string, subtitle: number | string, client: any) {
     const room = await this.roomModel.findOne({ _id: roomId }) as Room;
 
     if (room) {
@@ -174,6 +134,7 @@ export class SocketService implements OnGatewayConnection {
 
       room.clients.push({
         id: client.id,
+        subtitle: typeof subtitle === 'string' ? parseInt(subtitle) : subtitle,
         name: userName
       });
 
@@ -208,12 +169,6 @@ export class SocketService implements OnGatewayConnection {
       room.clients = room.clients.filter(el => el.id !== client.id);
       await room.save();
       await this.roomListWasChanged();
-
-      // if (index !== -1) {
-      //   room.clients.splice(index, 1);
-      //   console.log('after fix', room.clients);
-      //
-      // }
     }
   }
 
