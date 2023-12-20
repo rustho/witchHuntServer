@@ -12,6 +12,7 @@ import { Client, Room, RoomDocument } from "../room/room.model";
 import mongoose, { Model } from "mongoose";
 
 @WebSocketGateway({
+  namespace: '/sockets',
   cors: {
     origin: "*"
   }
