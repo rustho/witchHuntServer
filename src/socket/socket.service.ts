@@ -70,7 +70,7 @@ export class SocketService implements OnGatewayConnection {
     await this.addToRoom(roomId, userName, subtitle, client);
 
     const clientsInRoom = await this.getRoomClients(roomId);
-    const data = { room: roomId, clients: clientsInRoom, userName };
+    const data = { room: roomId, clients: clientsInRoom, userName, subtitle };
     this.server.to(roomId).emit("roomChanged", data);
 
     await this.roomListWasChanged();
@@ -162,12 +162,18 @@ export class SocketService implements OnGatewayConnection {
   private async removeFromRoom(roomId: string, client: any) {
     console.log("roomId", roomId);
     console.log("clientID", client.id);
-    const room = await this.roomModel.findOne({ _id: roomId }) as Room;
-
-    console.log("ssss", room);
-    if (room) {
-      room.clients = room.clients.filter(el => el.id !== client.id);
-      await room.save();
+  
+    // Find and update the room in the database
+    const updatedRoom = await this.roomModel.findOneAndUpdate(
+      { _id: roomId },
+      { $pull: { clients: { id: client.id } } },
+      { new: true }
+    ) as Room;
+  
+    console.log("Updated Room", updatedRoom);
+  
+    // Update the in-memory representation if the room was found and updated
+    if (updatedRoom) {
       await this.roomListWasChanged();
     }
   }

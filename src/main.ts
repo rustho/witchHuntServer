@@ -4,8 +4,6 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: true });
 
-  // app.setGlobalPrefix('nest');
-
   await app.listen(3333);
 }
 bootstrap();
