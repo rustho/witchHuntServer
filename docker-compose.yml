@@ -3,4 +3,4 @@ services:
   nest-app:
     build: .
     ports:
-      - "3000:3000"
+      - "3333:3333"
