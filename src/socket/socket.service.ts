@@ -10,6 +10,7 @@ import { Server } from "socket.io";
 import { InjectModel } from "@nestjs/mongoose";
 import { Client, Room, RoomDocument } from "../room/room.model";
 import mongoose, { Model } from "mongoose";
+import wait from "src/ts/wait";
 
 @WebSocketGateway({
   cors: {
@@ -64,7 +65,7 @@ export class SocketService implements OnGatewayConnection {
     userName,
     subtitle
   }: { roomId: string, userName: string, subtitle: number | string }, @ConnectedSocket() client: any) {
-    await this.leaveRoom(roomId, client);
+    // await this.leaveRoom(roomId, client);
 
     client.join(roomId);
     await this.addToRoom(roomId, userName, subtitle, client);
@@ -88,7 +89,8 @@ export class SocketService implements OnGatewayConnection {
   }
 
   private async leaveRoom(roomId: string, client: any) {
-    client.leave(roomId);
+    await client.leave(roomId);
+
     await this.removeFromRoom(roomId, client);
 
     const clientsInRoom = await this.getRoomClients(roomId);
@@ -106,7 +108,7 @@ export class SocketService implements OnGatewayConnection {
   async handleCreateRoom(@MessageBody() roomData: { room: string }, @ConnectedSocket() client: any) {
     const roomId: string = roomData.room;
 
-    client.join(roomId);
+    await client.join(roomId);
     await this.addRoom(roomId, client);
 
     await this.roomListWasChanged();
@@ -168,9 +170,10 @@ export class SocketService implements OnGatewayConnection {
       { _id: roomId },
       { $pull: { clients: { id: client.id } } },
       { new: true }
-    ) as Room;
-  
-    console.log("Updated Room", updatedRoom);
+    ).catch(error => {
+      console.error('Error updating room:', error);
+      throw error;
+    }) as Room;
   
     // Update the in-memory representation if the room was found and updated
     if (updatedRoom) {
