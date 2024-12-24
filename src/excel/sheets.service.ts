@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { google } from 'googleapis';
 import { UserDto } from './dto/user.dto';
+import { StatsDto } from './dto/stats.dto';
 
 @Injectable()
 export class SheetsService {
@@ -42,18 +43,28 @@ export class SheetsService {
     }
   }
 
-  async postStatisticToSheet(
-    spreadsheetId: string,
-    range: string,
-    data: any,
-  ): Promise<void> {
+  async getStatsFromSheet(range: string = 'Stats!A:J'): Promise<any> {
+    const data = await this.parseSheetToJson(range);
+    return data;
+  }
+
+  async postStatisticToSheet(range: string, data: StatsDto): Promise<void> {
     try {
+      const prevStats = await this.getStatsFromSheet(range);
+      const repeatedStats = prevStats.filter((stat) =>
+        data.stats.some((newStat) => newStat.id === stat.id),
+      );
+      const newStats = data.stats.filter(
+        (stat) => !repeatedStats.some((newStat) => newStat.id === stat.id),
+      );
+
+      const allStats = [...repeatedStats, ...newStats];
       await this.sheets.spreadsheets.values.append({
-        spreadsheetId,
+        spreadsheetId: this.SPREADSHEET_ID,
         range,
         valueInputOption: 'RAW',
         requestBody: {
-          values: [data],
+          values: [allStats],
         },
       });
     } catch (error) {
@@ -61,14 +72,10 @@ export class SheetsService {
     }
   }
 
-  async postGameHistoryToSheet(
-    spreadsheetId: string,
-    range: string,
-    data: any,
-  ): Promise<void> {
+  async postGameHistoryToSheet(range: string, data: any): Promise<void> {
     try {
       await this.sheets.spreadsheets.values.append({
-        spreadsheetId,
+        spreadsheetId: this.SPREADSHEET_ID,
         range,
         valueInputOption: 'RAW',
         requestBody: {

@@ -1,6 +1,7 @@
 import { Controller, Get, Query, Post, Body } from '@nestjs/common';
 import { SheetsService } from './sheets.service';
 import { UserDto } from './dto/user.dto';
+import { StatsDto } from './dto/stats.dto';
 
 @Controller('sheets')
 export class SheetsController {
@@ -13,21 +14,19 @@ export class SheetsController {
     return this.sheetsService.parseSheetToJson(range);
   }
 
-  @Post('statistic')
+  @Post('stats')
   async postStatistic(
-    @Query('spreadsheetId') spreadsheetId: string,
-    @Query('range') range: string = 'Statistics!A:C',
-    @Body() data: any,
+    @Query('range') range: string = 'Stats!A:J',
+    @Body() data: StatsDto,
   ): Promise<void> {
-    await this.sheetsService.postStatisticToSheet(spreadsheetId, range, data);
+    await this.sheetsService.postStatisticToSheet(range, data);
   }
 
   @Post('game-history')
   async postGameHistory(
-    @Query('spreadsheetId') spreadsheetId: string,
     @Query('range') range: string = 'GameHistory!A:C',
     @Body() data: any,
   ): Promise<void> {
-    await this.sheetsService.postGameHistoryToSheet(spreadsheetId, range, data);
+    await this.sheetsService.postGameHistoryToSheet(range, data);
   }
 }
