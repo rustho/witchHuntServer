@@ -14,19 +14,11 @@ export class SheetsController {
     return this.sheetsService.parseSheetToJson(range);
   }
 
-  @Post('stats')
+  @Post('/stats')
   async postStatistic(
     @Query('range') range: string = 'Stats!A:J',
     @Body() data: StatsDto,
   ): Promise<void> {
-    await this.sheetsService.postStatisticToSheet(range, data);
-  }
-
-  @Post('game-history')
-  async postGameHistory(
-    @Query('range') range: string = 'GameHistory!A:C',
-    @Body() data: any,
-  ): Promise<void> {
-    await this.sheetsService.postGameHistoryToSheet(range, data);
+    await this.sheetsService.postStats(range, data);
   }
 }
