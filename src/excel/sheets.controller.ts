@@ -11,7 +11,7 @@ export class SheetsController {
   async getPlayers(
     @Query('range') range: string = 'Players!A:C',
   ): Promise<UserDto[]> {
-    return this.sheetsService.parseSheetToJson(range);
+    return this.sheetsService.getPlayers(range);
   }
 
   @Post('/stats')
