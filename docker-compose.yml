@@ -5,14 +5,11 @@ services:
     ports:
       - '3333:3333'
     environment:
-      - NODE_ENV=development
-      - GOOGLE_SPREADSHEET_ID=your_spreadsheet_id
-      - GOOGLE_SERVICE_ACCOUNT_EMAIL=your_service_account_email
-      - GOOGLE_PRIVATE_KEY=your_private_key
-      - NODE_OPTIONS=--max-old-space-size=512
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+      - NODE_ENV=${NODE_ENV}
+      - GOOGLE_SPREADSHEET_ID=${GOOGLE_SPREADSHEET_ID}
+      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
+      - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
+      - NODE_OPTIONS=${NODE_OPTIONS}
     deploy:
       resources:
         limits:

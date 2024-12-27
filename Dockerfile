@@ -1,13 +1,23 @@
-FROM node:18
+# Build stage
+FROM node:18-alpine AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY package*.json ./
-
-RUN npm install
-
+# Copy source code
 COPY . .
+
+# Install ALL dependencies (including devDependencies needed for build)
+RUN npm ci
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine as runner
+
+WORKDIR /app
+COPY --from=builder /app ./
 
 EXPOSE 3333
 
-CMD ["npm", "run", "start:dev"]
+CMD ["npm", "run", "start:prod"]
