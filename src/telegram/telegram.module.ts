@@ -9,16 +9,16 @@ import { session } from 'telegraf';
 @Module({
   imports: [
     ConfigModule.forRoot({
-        isGlobal: true,
-      }),
+      isGlobal: true,
+    }),
     TelegrafModule.forRootAsync({
-        useFactory: () => ({
-          token: process.env.BOT_TOKEN,
-          middlewares: [session()],
-        })
+      useFactory: () => ({
+        token: process.env.TELEGRAM_BOT_TOKEN,
+        middlewares: [session()],
+      }),
     }),
     SheetsModule,
   ],
   providers: [TelegramService, TelegramUpdate],
 })
-export class TelegramModule {} 
+export class TelegramModule {}
