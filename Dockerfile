@@ -20,4 +20,8 @@ COPY --from=builder /app ./
 
 EXPOSE 3333
 
+# Add after EXPOSE 3333
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:3333 || exit 1
+
 CMD ["npm", "run", "start:prod"]

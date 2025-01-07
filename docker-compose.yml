@@ -4,6 +4,7 @@ services:
     build: .
     ports:
       - '3333:3333'
+    restart: always
     environment:
       - NODE_ENV=${NODE_ENV}
       - GOOGLE_SPREADSHEET_ID=${GOOGLE_SPREADSHEET_ID}
