@@ -36,11 +36,18 @@ async function bootstrap() {
     process.on(signal, async () => {
       console.log(`${signal} received. Starting graceful shutdown...`);
       try {
+        console.log('Closing NestJS application...');
         await app.close();
+        console.log('NestJS application closed successfully');
+
+        // Add small delay to ensure logs are written
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         console.log('Application shutdown complete.');
         process.exit(0);
       } catch (err) {
         console.error('Error during shutdown:', err);
+        console.error(err.stack);
         process.exit(1);
       }
     });
