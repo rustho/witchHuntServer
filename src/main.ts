@@ -22,11 +22,6 @@ async function bootstrap() {
   // Enable graceful shutdown
   app.enableShutdownHooks();
 
-  // @ts-expect-error fix after time
-  app.get('/health', (_req: any, res: any) => {
-    res.status(200).send('OK');
-  });
-
   const port = process.env.PORT || 3333;
 
   await app.listen(port, '0.0.0.0', () => {
