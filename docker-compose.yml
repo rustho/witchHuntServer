@@ -3,7 +3,7 @@ services:
   nest-app:
     build: .
     ports:
-      - '3333:3333'
+      - '${PORT:-3333}:${PORT:-3333}'
     restart: always
     environment:
       - NODE_ENV=${NODE_ENV}
@@ -12,6 +12,7 @@ services:
       - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - NODE_OPTIONS=${NODE_OPTIONS}
+      - PORT=${PORT:-3333}
     deploy:
       resources:
         limits:

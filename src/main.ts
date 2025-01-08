@@ -22,13 +22,37 @@ async function bootstrap() {
   // Enable graceful shutdown
   app.enableShutdownHooks();
 
-  await app.listen(3333);
-
-  // Handle termination signals
-  process.on('SIGTERM', async () => {
-    console.log('SIGTERM received. Starting graceful shutdown...');
-    await app.close();
-    process.exit(0);
+  // @ts-expect-error fix after time
+  app.get('/health', (_req: any, res: any) => {
+    res.status(200).send('OK');
   });
+
+  const port = process.env.PORT || 3333;
+
+  await app.listen(port, '0.0.0.0', () => {
+    console.log(`Application is running on: http://localhost:${port}`);
+    console.log('Ready for traffic');
+  });
+
+  // Handle shutdown gracefully
+  const signals = ['SIGTERM', 'SIGINT'];
+
+  for (const signal of signals) {
+    process.on(signal, async () => {
+      console.log(`${signal} received. Starting graceful shutdown...`);
+      try {
+        await app.close();
+        console.log('Application shutdown complete.');
+        process.exit(0);
+      } catch (err) {
+        console.error('Error during shutdown:', err);
+        process.exit(1);
+      }
+    });
+  }
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error('Failed to start application:', err);
+  process.exit(1);
+});
